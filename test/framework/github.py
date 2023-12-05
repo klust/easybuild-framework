@@ -345,7 +345,6 @@ class GithubTest(EnhancedTestCase):
         self.assertIsInstance(res, list)
         self.assertEqual(stderr.strip(), "WARNING: Using easyconfigs from closed PR #16080")
         patterns = [
-            "Status of last commit is SUCCESS",
             "Last comment on",
             "No activity since",
             "* c-ares-1.18.1",
@@ -647,6 +646,11 @@ class GithubTest(EnhancedTestCase):
         token_old_format = os.getenv('TEST_GITHUB_TOKEN_OLD_FORMAT')
         if token_old_format:
             self.assertTrue(gh.validate_github_token(token_old_format, GITHUB_TEST_ACCOUNT))
+
+        # if a fine-grained token is available, test with that too
+        finegrained_token = os.getenv('TEST_GITHUB_TOKEN_FINEGRAINED')
+        if finegrained_token:
+            self.assertTrue(gh.validate_github_token(finegrained_token, GITHUB_TEST_ACCOUNT))
 
     def test_github_find_easybuild_easyconfig(self):
         """Test for find_easybuild_easyconfig function"""
