@@ -1,6 +1,9 @@
 ##
 # Copyright 2013-2024 Ghent University
 #
+# This file is triple-licensed under GPLv2 (see below), MIT, and
+# BSD three-clause licenses.
+#
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
 # with support of Ghent University (http://ugent.be/hpc),
@@ -23,21 +26,20 @@
 # along with EasyBuild.  If not, see <http://www.gnu.org/licenses/>.
 ##
 """
-EasyBuild support for iibff compiler toolchain (includes Intel compilers + MPI, BLIS, libFLAME, ScaLAPACK and FFTW).
+EasyBuild support for gmpflf compiler toolchain (includes GCC, MPICH, FlexiBLAS, LAPACK, ScaLAPACK and FFTW).
 
 Authors:
 
-* Kenneth Hoste (HPC-UGent)
+* Richard Topouchian (University of Bergen)
 """
-
-from easybuild.toolchains.iimpi import Iimpi
-from easybuild.toolchains.linalg.blis import Blis
-from easybuild.toolchains.linalg.flame import Flame
-from easybuild.toolchains.linalg.scalapack import ScaLAPACK
+from easybuild.toolchains.gmpich import Gmpich
+from easybuild.toolchains.gfbf import Gfbf
 from easybuild.toolchains.fft.fftw import Fftw
+from easybuild.toolchains.linalg.flexiblas import FlexiBLAS
+from easybuild.toolchains.linalg.scalapack import ScaLAPACK
 
 
-class Iibff(Iimpi, Blis, Flame, ScaLAPACK, Fftw):
-    """Compiler toolchain with GCC, OpenMPI, BLIS, libFLAME, ScaLAPACK and FFTW."""
-    NAME = 'iibff'
-    SUBTOOLCHAIN = Iimpi.NAME
+class Gmpflf(Gmpich, FlexiBLAS,  ScaLAPACK, Fftw):
+    """Compiler toolchain with GCC, MPICH, FlexiBLAS, ScaLAPACK and FFTW."""
+    NAME = 'gmpflf'
+    SUBTOOLCHAIN = [Gmpich.NAME, Gfbf.NAME]

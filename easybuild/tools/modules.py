@@ -1,5 +1,5 @@
 ##
-# Copyright 2009-2023 Ghent University
+# Copyright 2009-2024 Ghent University
 #
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -37,6 +37,7 @@ Authors:
 * Jens Timmerman (Ghent University)
 * David Brown (Pacific Northwest National Laboratory)
 """
+import glob
 import os
 import re
 import shlex
@@ -52,6 +53,7 @@ from easybuild.tools.filetools import convert_name, mkdir, normalize_path, path_
 from easybuild.tools.module_naming_scheme.mns import DEVEL_MODULE_SUFFIX
 from easybuild.tools.py2vs3 import subprocess_popen_text
 from easybuild.tools.run import run_cmd
+from easybuild.tools.systemtools import get_shared_lib_ext
 from easybuild.tools.utilities import get_subclasses, nub
 
 # software root/version environment variable name prefixes
@@ -307,9 +309,9 @@ class ModulesTool(object):
         """Check whether selected module tool matches 'module' function definition."""
         if self.testing:
             # grab 'module' function definition from environment if it's there; only during testing
-            if 'module' in os.environ:
+            try:
                 out, ec = os.environ['module'], 0
-            else:
+            except KeyError:
                 out, ec = None, 1
         else:
             cmd = "type module"
@@ -851,6 +853,8 @@ class ModulesTool(object):
             # this needs to be taken into account when updating the environment via produced output, see below
 
             # keep track of current values of select env vars, so we can correct the adjusted values below
+            # Identical to `{key: os.environ.get(key, '').split(os.pathsep)[::-1] for key in LD_ENV_VAR_KEYS}`
+            # but Python 2 treats that as a local function and refused the `exec` below
             prev_ld_values = dict([(key, os.environ.get(key, '').split(os.pathsep)[::-1]) for key in LD_ENV_VAR_KEYS])
 
             # Change the environment
@@ -1126,7 +1130,7 @@ class ModulesTool(object):
 
         if modpath_exts is None:
             # only retain dependencies that have a non-empty lists of $MODULEPATH extensions
-            modpath_exts = dict([(k, v) for k, v in self.modpath_extensions_for(deps).items() if v])
+            modpath_exts = {k: v for k, v in self.modpath_extensions_for(deps).items() if v}
             self.log.debug("Non-empty lists of module path extensions for dependencies: %s" % modpath_exts)
 
         mods_to_top = []
@@ -1157,7 +1161,7 @@ class ModulesTool(object):
         path = mods_to_top[:]
         if mods_to_top:
             # remove retained dependencies from the list, since we're climbing up the module tree
-            remaining_modpath_exts = dict([m for m in modpath_exts.items() if not m[0] in mods_to_top])
+            remaining_modpath_exts = {m: v for m, v in modpath_exts.items() if m not in mods_to_top}
 
             self.log.debug("Path to top from %s extended to %s, so recursing to find way to the top",
                            mod_name, mods_to_top)
@@ -1653,9 +1657,7 @@ def get_software_root(name, with_env_var=False):
     """
     env_var = get_software_root_env_var_name(name)
 
-    root = None
-    if env_var in os.environ:
-        root = os.getenv(env_var)
+    root = os.getenv(env_var)
 
     if with_env_var:
         res = (root, env_var)
@@ -1671,6 +1673,7 @@ def get_software_libdir(name, only_one=True, fs=None):
 
     Returns the library subdirectory, relative to software root.
     It fails if multiple library subdirs are found, unless only_one is False which yields a list of all library subdirs.
+    If only_one is True and fs is None, select the one subdirectory with shared or static libraries, if possible.
 
     :param name: name of the software package
     :param only_one: indicates whether only one lib path is expected to be found
@@ -1703,6 +1706,16 @@ def get_software_libdir(name, only_one=True, fs=None):
             if len(res) == 1:
                 res = res[0]
             else:
+                if fs is None and len(res) == 2:
+                    # if both lib and lib64 were found, check if only one (exactly) has libraries;
+                    # this is needed for software with library archives in lib64 but other files/directories in lib
+                    lib_glob = ['*.%s' % ext for ext in ['a', get_shared_lib_ext()]]
+                    has_libs = [any(glob.glob(os.path.join(root, subdir, f)) for f in lib_glob) for subdir in res]
+                    if has_libs[0] and not has_libs[1]:
+                        return res[0]
+                    elif has_libs[1] and not has_libs[0]:
+                        return res[1]
+
                 raise EasyBuildError("Multiple library subdirectories found for %s in %s: %s",
                                      name, root, ', '.join(res))
         return res
@@ -1723,9 +1736,7 @@ def get_software_version(name):
     """
     env_var = get_software_version_env_var_name(name)
 
-    version = None
-    if env_var in os.environ:
-        version = os.getenv(env_var)
+    version = os.getenv(env_var)
 
     return version
 
@@ -1754,7 +1765,7 @@ def avail_modules_tools():
     """
     Return all known modules tools.
     """
-    class_dict = dict([(x.__name__, x) for x in get_subclasses(ModulesTool)])
+    class_dict = {x.__name__: x for x in get_subclasses(ModulesTool)}
     # filter out legacy Modules class
     if 'Modules' in class_dict:
         del class_dict['Modules']

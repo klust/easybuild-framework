@@ -1,5 +1,5 @@
 # #
-# Copyright 2009-2023 Ghent University
+# Copyright 2009-2024 Ghent University
 #
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -60,7 +60,7 @@ OTHER = (9, 'other')
 # we use a tuple here so we can sort them based on the numbers
 CATEGORY_NAMES = ['BUILD', 'CUSTOM', 'DEPENDENCIES', 'EXTENSIONS', 'FILEMANAGEMENT', 'HIDDEN',
                   'LICENSE', 'MANDATORY', 'MODULES', 'OTHER', 'TOOLCHAIN']
-ALL_CATEGORIES = dict((name, eval(name)) for name in CATEGORY_NAMES)
+ALL_CATEGORIES = {name: eval(name) for name in CATEGORY_NAMES}
 
 # List of tuples. Each tuple has the following format (key, [default, help text, category])
 DEFAULT_CONFIG = {
@@ -109,6 +109,7 @@ DEFAULT_CONFIG = {
     'hidden': [False, "Install module file as 'hidden' by prefixing its version with '.'", BUILD],
     'installopts': ['', 'Extra options for installation', BUILD],
     'maxparallel': [None, 'Max degree of parallelism', BUILD],
+    'module_only': [False, 'Only generate module file', BUILD],
     'parallel': [None, ('Degree of parallelism for e.g. make (default: based on the number of '
                         'cores, active cpuset and restrictions in ulimit)'), BUILD],
     'patches': [[], "List of patches to apply", BUILD],

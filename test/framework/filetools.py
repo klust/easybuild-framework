@@ -1,5 +1,5 @@
 # #
-# Copyright 2012-2023 Ghent University
+# Copyright 2012-2024 Ghent University
 #
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -33,6 +33,7 @@ Unit tests for filetools.py
 """
 import datetime
 import glob
+import logging
 import os
 import re
 import shutil
@@ -297,10 +298,26 @@ class FileToolsTest(EnhancedTestCase):
                       'b7297da8b547d5e74b851d7c4e475900cec4744df0f887ae5c05bf1757c224b4',
         }
 
+        old_log_level = ft._log.getEffectiveLevel()
+        ft._log.setLevel(logging.DEBUG)
         # make sure checksums computation/verification is correct
         for checksum_type, checksum in known_checksums.items():
             self.assertEqual(ft.compute_checksum(fp, checksum_type=checksum_type), checksum)
-            self.assertTrue(ft.verify_checksum(fp, (checksum_type, checksum)))
+            with self.log_to_testlogfile():
+                self.assertTrue(ft.verify_checksum(fp, (checksum_type, checksum)))
+            self.assertIn('Computed ' + checksum_type, ft.read_file(self.logfile))
+            # Passing precomputed checksums reuses it
+            with self.log_to_testlogfile():
+                computed_checksums = {checksum_type: checksum}
+                self.assertTrue(ft.verify_checksum(fp, (checksum_type, checksum), computed_checksums))
+            self.assertIn('Precomputed ' + checksum_type, ft.read_file(self.logfile))
+            # If the type isn't contained the checksum will be computed
+            with self.log_to_testlogfile():
+                computed_checksums = {'doesnt exist': 'checksum'}
+                self.assertTrue(ft.verify_checksum(fp, (checksum_type, checksum), computed_checksums))
+            self.assertIn('Computed ' + checksum_type, ft.read_file(self.logfile))
+
+        ft._log.setLevel(old_log_level)
 
         # default checksum type is MD5
         self.assertEqual(ft.compute_checksum(fp), known_checksums['md5'])
@@ -320,7 +337,7 @@ class FileToolsTest(EnhancedTestCase):
             self.assertErrorRegex(EasyBuildError, error_pattern, ft.verify_checksum, fp, checksum)
 
         # make sure faulty checksums are reported
-        broken_checksums = dict([(typ, val[:-3] + 'foo') for (typ, val) in known_checksums.items()])
+        broken_checksums = {typ: (val[:-3] + 'foo') for typ, val in known_checksums.items()}
         for checksum_type, checksum in broken_checksums.items():
             self.assertFalse(ft.compute_checksum(fp, checksum_type=checksum_type) == checksum)
             self.assertFalse(ft.verify_checksum(fp, (checksum_type, checksum)))
@@ -1505,8 +1522,7 @@ class FileToolsTest(EnhancedTestCase):
         lic_server = '1234@example.license.server'
 
         # make test robust against environment in which $LM_LICENSE_FILE is defined
-        if 'LM_LICENSE_FILE' in os.environ:
-            del os.environ['LM_LICENSE_FILE']
+        os.environ.pop('LM_LICENSE_FILE', None)
 
         # default return value
         self.assertEqual(ft.find_flexlm_license(), ([], None))
@@ -2630,8 +2646,7 @@ class FileToolsTest(EnhancedTestCase):
         """Test find_eb_script function."""
 
         # make sure $EB_SCRIPT_PATH is not set already (used as fallback mechanism in find_eb_script)
-        if 'EB_SCRIPT_PATH' in os.environ:
-            del os.environ['EB_SCRIPT_PATH']
+        os.environ.pop('EB_SCRIPT_PATH', None)
 
         self.assertExists(ft.find_eb_script('rpath_args.py'))
         self.assertExists(ft.find_eb_script('rpath_wrapper_template.sh.in'))
